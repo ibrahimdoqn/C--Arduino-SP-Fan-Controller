@@ -22,11 +22,15 @@ namespace WindowsFormsApp1
         {
             InitializeComponent();
         }
+        private int tempcpu = 0;
+        private int tempgpu = 0;
 
 
         private void Form1_Load(object sender, EventArgs e)
         {
             timer1.Start();
+            timer2.Start();
+            timer3.Start();
             hScrollBar1.Minimum = 40;
             hScrollBar1.Maximum = 100;
             notifyIcon1.Visible = true;
@@ -35,8 +39,13 @@ namespace WindowsFormsApp1
             {
                 comboBox1.Items.Add(portAdi);
             }
-            try {comboBox1.SelectedIndex = 0;}
-            catch { MessageBox.Show("Arduino bulunamadı"); }
+            try {comboBox1.SelectedIndex = 1;}
+            catch
+            {
+                try { comboBox1.SelectedIndex = 0; }
+                catch { MessageBox.Show("Arduino bulunamadı"); }
+            }
+
         }
 
 
@@ -82,69 +91,20 @@ namespace WindowsFormsApp1
             else if (tempcpu > 42) seriPort.Write("8");
             else seriPort.Write("9");
             seriPort.Close();
-}
+        }
         private int maxSicaklik = 0;
         private void Timer1_Tick(object sender, EventArgs e)
         {
-            Computer computer = new Computer() { CPUEnabled = true, GPUEnabled = false };
-            Computer gpu = new Computer() { CPUEnabled = false, GPUEnabled = true };
-            computer.Open();
-            int tempcpu = 0;
-            int tempgpu = 0;
-            foreach (IHardware hardware in computer.Hardware)
-            {
-                hardware.Update();
-                
-                foreach (ISensor sensor in hardware.Sensors)
-                {
-                    // Celsius is default unit
-
-                    if (sensor.SensorType == SensorType.Temperature)
-                    {
-                        tempcpu = (tempcpu + Convert.ToInt32(sensor.Value)) / 2;
-                    }
-                }
-                label1.Text ="Cpu Sıcaklığı = " + Convert.ToString(tempcpu);
-
-            }
-
-            gpu.Open();
-            foreach (IHardware hardware in gpu.Hardware)
-            {
-                hardware.Update();
-
-                foreach (ISensor sensor in hardware.Sensors)
-                {
-                    // Celsius is default unit
-                    if (sensor.SensorType == SensorType.Temperature)
-                    {
-                        tempgpu = Convert.ToInt32(sensor.Value);
-                    }
-                }
-                label3.Text = "Gpu Sıcaklığı = " + Convert.ToString(tempgpu);
-            }
-            label4.Text = "  Ortalama sıcaklık " + ((tempcpu + tempgpu) / 2);
-
-            if (tempcpu > tempgpu)
-            {
-                if (tempcpu > maxSicaklik) maxSicaklik = tempcpu;
-            }
-            else
-            {
-                if (tempgpu > maxSicaklik) maxSicaklik = tempgpu;
-            }
-            label4.Text = label4.Text + "\nMaxiumum Sıcaklık " + Convert.ToString(maxSicaklik);
-            if (tempcpu > 75 || tempgpu > 75)
-                {
-                    NotifyBildirim("Yüksek sıcaklık değeri", "Lütfen sıcaklığı kontrol edin");
-                }
             if (button2.Enabled == false)
             {
-                if (tempcpu > tempgpu) seriPort(tempcpu);
-                else seriPort(tempgpu);
+                seriPort(sdeger(tempcpu, tempgpu));
             }
-            if (FormWindowState.Minimized == this.WindowState) this.Hide();
-            notifyIcon1.Text = "CPU Temp: " + Convert.ToString(tempcpu) + " GPU Temp : " + Convert.ToString(tempgpu);
+        }
+
+        private int sdeger(int tempcpu, int tempgpu)
+        {
+            if (tempcpu > tempgpu) return tempcpu;
+            else return tempgpu;
         }
 
         private void NotifyBildirim(string baslik, string mesaj)
@@ -197,5 +157,95 @@ namespace WindowsFormsApp1
 
         }
 
+
+
+        private void timer2_Tick(object sender, EventArgs e)
+        {
+            Computer computer = new Computer() { CPUEnabled = true, GPUEnabled = false };
+            Computer gpu = new Computer() { CPUEnabled = false, GPUEnabled = true };
+            computer.Open();
+            foreach (IHardware hardware in computer.Hardware)
+            {
+                hardware.Update();
+
+                foreach (ISensor sensor in hardware.Sensors)
+                {
+                    // Celsius is default unit
+
+                    if (sensor.SensorType == SensorType.Temperature)
+                    {
+                        tempcpu = (tempcpu + Convert.ToInt32(sensor.Value)) / 2;
+                    }
+                }
+                label1.Text = "Cpu Sıcaklığı = " + Convert.ToString(tempcpu);
+
+            }
+
+            gpu.Open();
+            foreach (IHardware hardware in gpu.Hardware)
+            {
+                hardware.Update();
+
+                foreach (ISensor sensor in hardware.Sensors)
+                {
+                    // Celsius is default unit
+                    if (sensor.SensorType == SensorType.Temperature)
+                    {
+                        tempgpu = Convert.ToInt32(sensor.Value);
+                    }
+                }
+                label3.Text = "Gpu Sıcaklığı = " + Convert.ToString(tempgpu);
+            }
+            label4.Text = "  Ortalama sıcaklık " + ((tempcpu + tempgpu) / 2);
+
+            //Max sıcaklık belirleme fonksiyonu
+            if (tempcpu > tempgpu)
+            {
+                if (tempcpu > maxSicaklik) maxSicaklik = tempcpu;
+            }
+            else
+            {
+                if (tempgpu > maxSicaklik) maxSicaklik = tempgpu;
+            }
+            label4.Text = label4.Text + "\nMaxiumum Sıcaklık " + Convert.ToString(maxSicaklik);
+
+            //Çok yüksek sıcaklık bildirimi
+            if (tempcpu > 75 || tempgpu > 75)
+            {
+                NotifyBildirim("Yüksek sıcaklık değeri", "Lütfen sıcaklığı kontrol edin");
+            }
+
+            if (FormWindowState.Minimized == this.WindowState) this.Hide();//Bildirim çubuğuna atmak için
+            notifyIcon1.Text = "CPU Temp: " + Convert.ToString(tempcpu) + " GPU Temp : " + Convert.ToString(tempgpu);//Bildirim çubuğunda sıcaklık gösterir
+
+            //Gecikme değerleri
+            if (sdeger(tempcpu, tempgpu) > 70) timer1.Interval = 2500;
+            else if (sdeger(tempcpu, tempgpu) > 60) timer1.Interval = 5000;
+            else if (sdeger(tempcpu, tempgpu) > 50) timer1.Interval = 30000;
+            else timer1.Interval = 10000;
+        }
+
+        //Bu satır 30 dk'de bir kasayı havalandırmak içindir
+        bool tim1 = true;
+        private void timer3_Tick(object sender, EventArgs e)
+        {
+            if(button2.Enabled == false)
+            {
+                if (tim1 == true)
+                {
+                    tim1 = false;
+                    timer1.Stop();
+                    seriPort(80);
+                    timer3.Interval = 30000;
+                }
+                else
+                {
+                    tim1 = true;
+                    timer1.Start();
+                    timer3.Interval = 1200000;
+                }
+            }
+
+        }
     }
 }
